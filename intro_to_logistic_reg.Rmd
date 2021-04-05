@@ -42,7 +42,7 @@ print(age)
 
 Cool, now let's introduce our little friend, `rbinom()`. The process were interested in, of choosing correct or incorrect, can be modeled as a Bernoulli trial, in statistical speak. `rbinom()` generates series of Bernoulli trials, and it takes three arguments: 1) the number of observations we want, 2) the number of trials per observation, and 3) the probability of a successful trial. Now, for the sake of simplicity, let's assume each bird has landed on either Feeder A or Feeder B 100 times. These are very precise birds!
 
-Let's use `rbinom()` to model 100 trials from a bird which never learns. Let's say, it's bird "a", who is also in group "A", meaning that it only has access to Feeder A. It just randomly chooses between Feeder A and Feeder B, never learning which is the right one, with $p(Feeder_A)=.5$. In the following output, 0 is a fail (visit to Feeder B), and 1 is a success (visit to Feeder A).
+Let's use `rbinom()` to model 100 trials from a bird which never learns. Let's say, it's bird "a", who is also in group "A", meaning that it only has access to Feeder A. It just randomly chooses between Feeder A and Feeder B, never learning which is the right one, with p(Feeder_A)=.5. In the following output, 0 is a fail (visit to Feeder B), and 1 is a success (visit to Feeder A).
 
 ```{r bernoulli}
 correct = rbinom(100, 1, 0.5)
@@ -96,15 +96,18 @@ knitr::kable(df_relationship)
 Logistic regressions take advantage of the fact that probabilities can be represented by linear combinations of log odds. The response of probability to predictors can be modeled by this underlying linear relationship. The mathematical formulas that explain the relationship between the predictors and response is:
 
 1. The relationship between log odds and the predictors:
+
 $$
 ln(\frac{p(y)}{1-p(y)})=\beta_0+\beta_1x_1 + ... \beta_nx_n
 $$
+
 2. Which is equivalent to this:
+
 $$
 p(y)=\frac{1}{1+e^{-(\beta_0+\beta_1x_1 + ... \beta_nx_n)}}
 $$
 
-After the algebra to solve for $p(y)$, the usual linear model is now tucked away in the denominator. The linear relationship this describes will be translated to a non-linear relationship of probability. We will see later that logistic regressions fall apart, the same way a regular linear regression does, when the relationship between our predictor and the log odds is not linear. For now, we are simulating data, so we can ensure that linear relationship!
+After the algebra to solve for p(y), the usual linear model is now tucked away in the denominator. The linear relationship this describes will be translated to a non-linear relationship of probability. We will see later that logistic regressions fall apart, the same way a regular linear regression does, when the relationship between our predictor and the log odds is not linear. For now, we are simulating data, so we can ensure that linear relationship!
 
 Back to our population of dumb birds, in which we know that there is **no** relationship between trial number and the probability of success.
 
@@ -113,7 +116,7 @@ m1 = glm(correct ~ 1 + trial_no, data=df_dumb, family=binomial)
 summary(m1)
 ```
 
-Beta estimates are given in log odds, here. To see what that means in terms of probability, we can convert these back into probability using our handy table above. The intercept value is about $0$, or $p(correct)=0.5$, as we expected. Further, we find that the estimate for trial number is roughly $0$, and there is no significant effect of trial number. The birds never learned, and the probability of choosing the correct choice remains $0.5$ independent of how many times a bird visited the feeder. However, using this table is cumbersome, and it's easier, and more accurate to write a function that converts these numbers for us. Let's do that now, since we'll use it in a moment
+Beta estimates are given in log odds, here. To see what that means in terms of probability, we can convert these back into probability using our handy table above. The intercept value is about 0, or p(correct)=0.5, as we expected. Further, we find that the estimate for trial number is roughly 0, and there is no significant effect of trial number. The birds never learned, and the probability of choosing the correct choice remains 0.5 independent of how many times a bird visited the feeder. However, using this table is cumbersome, and it's easier, and more accurate to write a function that converts these numbers for us. Let's do that now, since we'll use it in a moment
 
 ```{r}
 log_to_prob <- function(log_odds){
@@ -130,7 +133,7 @@ prob_to_log <- function(prob){
 
 ```
 
-So, what if we introduce a positive, linear relationship between trial and correct? We already have the variable in our dataframe, so all we need to do is put it into the `rbinom` function that produces $p(correct)$. The intercept (which represents the first trial) should be 0 log odds (1:1 odds, or .5 probability), since we don't expect birds to prefer the "wrong" feeder with no experience.
+So, what if we introduce a positive, linear relationship between trial and correct? We already have the variable in our dataframe, so all we need to do is put it into the `rbinom` function that produces p(correct). The intercept (which represents the first trial) should be 0 log odds (1:1 odds, or .5 probability), since we don't expect birds to prefer the "wrong" feeder with no experience.
 
 ```{r df_smart_linear_logit}
 df_smart = df_empty %>% 
@@ -163,7 +166,7 @@ The coefficient for trial number indicates the difference in log odds per 1 tria
 log_to_prob(coef(m1)[1] + coef(m1)[2]*1)
 log_to_prob(coef(m1)[1] + coef(m1)[2]*9)
 ```
-On the second trial, the probability of choosing the correct choice is $.53$. On the tenth trial, it's $.72$.
+On the second trial, the probability of choosing the correct choice is .53. On the tenth trial, it's .72.
 
 Let's plot the predicted values from the model over the real values.
 ```{r}
