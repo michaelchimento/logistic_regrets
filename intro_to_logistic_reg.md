@@ -12,22 +12,21 @@ and learn how to run and interpret a logistic GLM.
 
 Logistic models are trickier than a standard linear model to interpret,
 and running them on simulated data will allow us to see how the model
-captures structure in that type of data. We will further cover some
-basic methods for plotting the inferred values of the model parameters,
-in order to better understand how they would be useful in a real
-situation.
+captures known structure in the data. We will further cover some basic
+methods for plotting the inferred values of the model parameters, in
+order to better understand how they would be useful in a real situation.
 
 ## Simulating data
 
 Let’s imagine an experiment that you’ve just designed. You have a
-population of great tits that all have been banded with an RFID code, so
-you can identify individuals. You have feeders which have antennas that
-read their identity, and can give or deny access to the feeder, based on
-the identity of the bird. You split the birds into two groups, where
-Group A only has access to Feeder A, and Group B only has access to
-Feeder B. You’d like to test how quickly the birds learn, or, how the
-probability of choosing the “correct” feeder changes with each visit to
-the feeder.
+population of birds (let’s say, great tits) that all have been banded
+with an RFID code, so you can identify individuals. You have feeders
+which have antennas that read their identity, and can give or deny
+access to the feeder, based on the identity of the bird. You split the
+birds into two groups, where Group A only has access to Feeder A, and
+Group B only has access to Feeder B. You’d like to test how quickly the
+birds learn, or, how the probability of choosing the “correct” feeder
+changes with each visit to the feeder.
 
 Let’s start by defining a vector of identities for individual birds. We
 will take advantage of R’s letters variable, which contains the entire
@@ -76,11 +75,9 @@ let’s assume each bird has landed on either Feeder A or Feeder B 100
 times. These are very precise birds\!
 
 Let’s use `rbinom()` to model 100 trials from a bird which never learns.
-Let’s say, it’s bird “a”, who is also in group “A”, meaning that it only
-has access to Feeder A. It just randomly chooses between Feeder A and
-Feeder B, never learning which is the right one, with p(Feeder\_A)=.5.
-In the following output, 0 is a fail (visit to Feeder B), and 1 is a
-success (visit to Feeder A).
+It just randomly chooses between Feeder A and Feeder B, never learning
+which is the right one, with p(Feeder\_A)=.5. In the following output, 0
+is a fail (visit to Feeder B), and 1 is a success (visit to Feeder A).
 
 ``` r
 correct = rbinom(100, 1, 0.5)
@@ -187,12 +184,15 @@ df_dumb %>% group_by(bird_ID) %>% summarize(mean=mean(correct),sd=sd(correct))
 
 We have a bit more variation within birds due to sampling error. Here,
 we know exactly what process generated the data, and that the birds are
-normally distributed around 0.5. However, if it were real data, we
-wouldn’t be so sure if variation was due to sampling error, or reflected
-real differences between the birds. Of course, it will likely be both.
-We have to infer the parameters of the process that generated the real
-data. To infer parameters of the relationship between variables and
-Bernoulli trials, we can use **logistic regression**.
+normally distributed around the expected probability of 0.5. However, if
+it were real data, we wouldn’t be so sure if variation was due to
+sampling error, or reflected real differences between the birds. Of
+course, it will likely be both. We will eventually see (in part 2) how
+to capture these differences between individuals with more fancy GLMMS,
+but right now let’s keep it simple. We have to infer the parameters of
+the process that generated the real data. To infer parameters of the
+relationship between variables and Bernoulli trials, we can use a
+**logistic GLM**, or generalized linear model.
 
 ### Digression: Probability vs. Odds vs. Log odds
 
@@ -249,7 +249,7 @@ linear regression does, when the relationship between our predictor and
 the log odds is not linear. For now, we are simulating data, so we can
 ensure that linear relationship\!
 
-Back to our population of dumb birds, in which we know that there is
+Back to our population of bad birds, in which we know that there is
 **no** relationship between trial number and the probability of success.
 
 ``` r
