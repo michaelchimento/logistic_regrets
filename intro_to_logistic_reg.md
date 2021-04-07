@@ -329,18 +329,16 @@ summary(df_smart)
 ``` r
 ggplot(df_smart,aes(x=trial_no, y=correct))+
   geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
-  stat_smooth()
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
 ```
 
-    ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
+    ## No summary function supplied, defaulting to `mean_se()`
 
 ![](intro_to_logistic_reg_files/figure-gfm/df_smart_linear_logit-1.png)<!-- -->
 
-GGplot’s `stat_smooth()` function draws a best fitting GAM onto the
-data. This is fine for casually eye-balling relationships, but is not
-sufficient for anything worthy of publication. GAMs are pretty
-complicated, and GGPlot does everything under the hood—recovering
-parameter values is not so straightforward. Let’s look at it with
+GGplot’s `stat_summary()` function draws a point estimate and 95% SE for
+each trial. This is fine for casually eye-balling relationships, but is
+not sufficient for understanding the relationship. Let’s look at it with
 logistic regression.
 
 ``` r
@@ -374,7 +372,7 @@ summary(m1)
 Our relationship between trial number and success is simple here. To
 interpret the probability estimated at the intercept, we can put it in
 our helper function. To interpret the beta for trial number, we can
-simply exponentiate.
+simply exponentiate to get the point estimate.
 
 ``` r
 log_to_prob(coef(m1)[1])
@@ -395,8 +393,8 @@ per 1 trial. Exponentiating this difference gives us the odds. Odds over
 1 indicate a positive relationship, with decimal following one being
 interpreted as the percent increase in the odds of choosing correctly
 per trial (here, approximate 10% more likely to choose correct per
-trial). To recover the specific probability of choosing the correct
-feeder at a given trial, we can plug in values.
+trial). To recover the point estimate of the specific probability of
+choosing the correct feeder at a given trial, we can plug in values.
 
 ``` r
 log_to_prob(coef(m1)[1] + coef(m1)[2]*1)
@@ -412,28 +410,40 @@ log_to_prob(coef(m1)[1] + coef(m1)[2]*9)
     ## (Intercept) 
     ##   0.7152656
 
-On the second trial, the probability of choosing the correct choice is
-.53. On the tenth trial, it’s .72.
+On the second trial, the point estimate of the probability of choosing
+the correct choice is .53. On the tenth trial, it’s .72.
 
 Let’s plot the predicted values from the model over the real values.
+Since this is a GLM, and not a GLMM, each bird will receive the same
+predicted probability. In order to not plot 26 predictions per trial,
+let’s make a simpler dataframe with just 100 trials from an adult, and
+100 trials from a juvenile.
 
 ``` r
-df_smart$preds = predict(m1,type="response")
-ggplot(df_smart,aes(x=trial_no,y=correct))+
+df_predict = tibble(age=c("juv.","ad.")) %>% 
+  slice(rep(1:n(), each = 100)) %>%
+  mutate(age = as.factor(age)) %>% 
+  group_by(age) %>% 
+  mutate(trial_no=c(0:99)) %>% 
+  ungroup()
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
+```
+
+``` r
+ggplot(data=df_smart, aes(x=trial_no,y=correct))+
   geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
   stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
-  stat_summary(aes(x=trial_no,y=preds))+
-  labs(x="trial number",y="correct feeder",title="Group A")
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
 ```
 
     ## No summary function supplied, defaulting to `mean_se()`
-    ## No summary function supplied, defaulting to `mean_se()`
 
-![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 The fitted mean probability, conditional on trial number, is shown over
-the real mean. This looks pretty close to the GAM we saw before, and
-fits the data reasonably well.
+the real mean. This looks pretty close to mean values from
+`stat_summary()`, and fits the data reasonably well.
 
 One really important point here, is that the relationship we just
 modeled is **totally different** from specifying a linear relationship
@@ -462,11 +472,11 @@ summary(df_smart)
 
 ``` r
 ggplot(df_smart,aes(x=trial_no, y=correct))+
-  geom_point()+
-  stat_smooth()
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
 ```
 
-    ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
+    ## No summary function supplied, defaulting to `mean_se()`
 
 ![](intro_to_logistic_reg_files/figure-gfm/df_smart_linear_prob-1.png)<!-- -->
 
@@ -479,7 +489,7 @@ LO_seq=prob_to_log(prob_seq)
 qplot(x=c(0:99),y=LO_seq)
 ```
 
-![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 Weird, right? Such a simple linear increase in probability ends up with
 a non-linear increase in log-odds. Let’s see how a logistic model likes
@@ -521,18 +531,17 @@ log_to_prob(coef(m1)[1])
     ##    0.436014
 
 ``` r
-df_smart$preds = predict(m1,type="response")
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
 ggplot(df_smart,aes(x=trial_no,y=correct))+
   geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
   stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
-  stat_summary(aes(x=trial_no,y=preds))+
-  labs(x="trial number",y="correct feeder",title="Group A")
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
 ```
 
     ## No summary function supplied, defaulting to `mean_se()`
-    ## No summary function supplied, defaulting to `mean_se()`
 
-![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 By trying to fit a straight line through this curve, it’s ended up
 underestimating the intercept, and it will have over estimated the
@@ -541,3 +550,188 @@ higher on this model than the previous one, indicating a weaker fit to
 the data. The distinction between the relationship between log odds and
 predictors, versus a direct relationship between probability and the
 predictors is really important for understanding how these models work\!
+
+## Interaction effects in slope
+
+Let’s simulate a relationship in which both trial number and age matter,
+and show how the logistic regression can capture that information. Let’s
+say that younger birds learn faster than older birds. This means that
+the slope will differ between ages, but the intercept should be the
+same.
+
+``` r
+df_smart = df_empty %>% 
+  rowwise() %>% 
+  mutate(correct = ifelse(age=="ad.", rbinom(1,1,log_to_prob(.1*trial_no)), rbinom(1,1,log_to_prob(.2*trial_no))))
+
+ggplot(df_smart,aes(x=trial_no, y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
+```
+
+    ## No summary function supplied, defaulting to `mean_se()`
+    ## No summary function supplied, defaulting to `mean_se()`
+
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+``` r
+m1 = glm(correct ~ 1 + age + age:trial_no, data=df_smart, family=binomial)
+summary(m1)
+```
+
+    ## 
+    ## Call:
+    ## glm(formula = correct ~ 1 + age + age:trial_no, family = binomial, 
+    ##     data = df_smart)
+    ## 
+    ## Deviance Residuals: 
+    ##      Min        1Q    Median        3Q       Max  
+    ## -3.09481   0.00641   0.03997   0.20149   1.18767  
+    ## 
+    ## Coefficients:
+    ##                  Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)      -0.02411    0.18815  -0.128    0.898    
+    ## agejuv.           0.19211    0.31313   0.614    0.540    
+    ## agead.:trial_no   0.10223    0.01071   9.547  < 2e-16 ***
+    ## agejuv.:trial_no  0.17709    0.02572   6.886 5.74e-12 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## (Dispersion parameter for binomial family taken to be 1)
+    ## 
+    ##     Null deviance: 1096.10  on 2599  degrees of freedom
+    ## Residual deviance:  664.92  on 2596  degrees of freedom
+    ## AIC: 672.92
+    ## 
+    ## Number of Fisher Scoring iterations: 9
+
+To interpret the intercept for adults, we convert the intercept estimate
+from log odds to probability.
+
+``` r
+log_to_prob(coef(m1)[1])
+```
+
+    ## (Intercept) 
+    ##   0.4939721
+
+To interpret the intercept for juveniles, we convert the intercept + the
+beta estimate for juveniles from log odds to probability.
+
+``` r
+log_to_prob(coef(m1)[1]+coef(m1)[2])
+```
+
+    ## (Intercept) 
+    ##   0.5419005
+
+And finally we can plot predictions, faceted by age, to see how the
+difference in slopes is realized in probability space.
+
+``` r
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
+ggplot(df_smart,aes(x=trial_no,y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
+```
+
+    ## No summary function supplied, defaulting to `mean_se()`
+    ## No summary function supplied, defaulting to `mean_se()`
+
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+\#\#Interaction effects in slopes and intercepts
+
+This time, younger birds learn faster than older birds *and* are somehow
+clarivoyant, and are instictively more attracted to the correct choice.
+This means that both slope and intercept will differ between ages.
+
+``` r
+df_smart = df_empty %>% 
+  rowwise() %>% 
+  mutate(correct = ifelse(age=="ad.", rbinom(1,1,log_to_prob(.1*trial_no)), rbinom(1,1,log_to_prob(1 + .2*trial_no))))
+
+ggplot(df_smart,aes(x=trial_no, y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
+```
+
+    ## No summary function supplied, defaulting to `mean_se()`
+    ## No summary function supplied, defaulting to `mean_se()`
+
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+``` r
+m1 = glm(correct ~ 1 + age + age:trial_no, data=df_smart, family=binomial)
+summary(m1)
+```
+
+    ## 
+    ## Call:
+    ## glm(formula = correct ~ 1 + age + age:trial_no, family = binomial, 
+    ##     data = df_smart)
+    ## 
+    ## Deviance Residuals: 
+    ##     Min       1Q   Median       3Q      Max  
+    ## -4.6944   0.0048   0.0329   0.1741   1.2406  
+    ## 
+    ## Coefficients:
+    ##                  Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)      -0.14738    0.18856  -0.782  0.43444    
+    ## agejuv.           1.19878    0.36536   3.281  0.00103 ** 
+    ## agead.:trial_no   0.10701    0.01098   9.744  < 2e-16 ***
+    ## agejuv.:trial_no  0.17486    0.03577   4.888 1.02e-06 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## (Dispersion parameter for binomial family taken to be 1)
+    ## 
+    ##     Null deviance: 978.61  on 2599  degrees of freedom
+    ## Residual deviance: 583.71  on 2596  degrees of freedom
+    ## AIC: 591.71
+    ## 
+    ## Number of Fisher Scoring iterations: 10
+
+To interpret the intercept for adults, we convert the intercept estimate
+from log odds to probability.
+
+``` r
+log_to_prob(coef(m1)[1])
+```
+
+    ## (Intercept) 
+    ##   0.4632217
+
+To interpret the intercept for juveniles, we convert the intercept + the
+beta estimate for juveniles from log odds to probability
+
+``` r
+log_to_prob(coef(m1)[1]+coef(m1)[2])
+```
+
+    ## (Intercept) 
+    ##   0.7410446
+
+We see that the intercept is indeed higher. We can plot finally
+predictions, faceted by age, to see the difference in slopes and
+intercepts.
+
+``` r
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
+ggplot(df_smart,aes(x=trial_no,y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
+```
+
+    ## No summary function supplied, defaulting to `mean_se()`
+    ## No summary function supplied, defaulting to `mean_se()`
+
+![](intro_to_logistic_reg_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->

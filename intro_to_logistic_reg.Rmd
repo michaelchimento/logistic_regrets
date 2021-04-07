@@ -143,42 +143,53 @@ summary(df_smart)
 
 ggplot(df_smart,aes(x=trial_no, y=correct))+
   geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
-  stat_smooth()
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
 ```
 
-GGplot's `stat_smooth()` function draws a best fitting GAM onto the data. This is fine for casually eye-balling relationships, but is not sufficient for anything worthy of publication. GAMs are pretty complicated, and GGPlot does everything under the hood---recovering parameter values is not so straightforward. Let's look at it with logistic regression.
+GGplot's `stat_summary()` function draws a point estimate and 95% SE for each trial. This is fine for casually eye-balling relationships, but is not sufficient for understanding the relationship. Let's look at it with logistic regression.
 
 ```{r glm_smart_linear}
 m1 = glm(correct ~ 1 + trial_no, data=df_smart, family=binomial)
 summary(m1)
 ```
 
-Our relationship between trial number and success is simple here. To interpret the probability estimated at the intercept, we can put it in our helper function. To interpret the beta for trial number, we can simply exponentiate.
+Our relationship between trial number and success is simple here. To interpret the probability estimated at the intercept, we can put it in our helper function. To interpret the beta for trial number, we can simply exponentiate to get the point estimate.
 
 ```{r}
 log_to_prob(coef(m1)[1])
 exp(coef(m1)[2])
 ```
 
-The coefficient for trial number indicates the difference in log odds per 1 trial. Exponentiating this difference gives us the odds. Odds over 1 indicate a positive relationship, with decimal following one being interpreted as the percent increase in the odds of choosing correctly per trial (here, approximate 10% more likely to choose correct per trial). To recover the specific probability of choosing the correct feeder at a given trial, we can plug in values.
+The coefficient for trial number indicates the difference in log odds per 1 trial. Exponentiating this difference gives us the odds. Odds over 1 indicate a positive relationship, with decimal following one being interpreted as the percent increase in the odds of choosing correctly per trial (here, approximate 10% more likely to choose correct per trial). To recover the point estimate of the specific probability of choosing the correct feeder at a given trial, we can plug in values.
 
 ```{r}
 log_to_prob(coef(m1)[1] + coef(m1)[2]*1)
 log_to_prob(coef(m1)[1] + coef(m1)[2]*9)
 ```
-On the second trial, the probability of choosing the correct choice is .53. On the tenth trial, it's .72.
+On the second trial, the point estimate of the probability of choosing the correct choice is .53. On the tenth trial, it's .72.
 
-Let's plot the predicted values from the model over the real values.
+Let's plot the predicted values from the model over the real values. Since this is a GLM, and not a GLMM, each bird will receive the same predicted probability. In order to not plot 26 predictions per trial, let's make a simpler dataframe with just 100 trials from an adult, and 100 trials from a juvenile.
+
 ```{r}
-df_smart$preds = predict(m1,type="response")
-ggplot(df_smart,aes(x=trial_no,y=correct))+
-  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
-  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
-  stat_summary(aes(x=trial_no,y=preds))+
-  labs(x="trial number",y="correct feeder",title="Group A")
+df_predict = tibble(age=c("juv.","ad.")) %>% 
+  slice(rep(1:n(), each = 100)) %>%
+  mutate(age = as.factor(age)) %>% 
+  group_by(age) %>% 
+  mutate(trial_no=c(0:99)) %>% 
+  ungroup()
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
 ```
 
-The fitted mean probability, conditional on trial number, is shown over the real mean. This looks pretty close to the GAM we saw before, and fits the data reasonably well.
+
+```{r}
+ggplot(data=df_smart, aes(x=trial_no,y=correct))+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
+```
+
+The fitted mean probability, conditional on trial number, is shown over the real mean. This looks pretty close to mean values from `stat_summary()`, and fits the data reasonably well.
 
 One really important point here, is that the relationship we just modeled is **totally different** from specifying a linear relationship directly in the changes in probability. Just for fun, let's do that now, and see what we get. We have to bit a bit careful how we implement this relationship, since probability can't exceed 1. Let's again assume the intercept should be .5. Let's increment the probability by 1/200th every trial, so that at 100 trials, the birds should be choosing the correct feeder all the time.
 ```{r df_smart_linear_prob}
@@ -188,10 +199,9 @@ df_smart = df_empty %>%
 summary(df_smart)
 
 ggplot(df_smart,aes(x=trial_no, y=correct))+
-  geom_point()+
-  stat_smooth()
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
 ```
-
 
 We're directly manipulating probability here, not the log odds. Let's see what this probability function looks like in log-odds.
 
@@ -210,12 +220,101 @@ log_to_prob(coef(m1)[1])
 ```
 
 ```{r}
-df_smart$preds = predict(m1,type="response")
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
 ggplot(df_smart,aes(x=trial_no,y=correct))+
   geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
   stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
-  stat_summary(aes(x=trial_no,y=preds))+
-  labs(x="trial number",y="correct feeder",title="Group A")
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
 ```
 
 By trying to fit a straight line through this curve, it's ended up underestimating the intercept, and it will have over estimated the probabilities in the middle of the trial sequence. The AIC score is higher on this model than the previous one, indicating a weaker fit to the data. The distinction between the relationship between log odds and predictors, versus a direct relationship between probability and the predictors is really important for understanding how these models work!
+
+## Interaction effects in slope
+
+Let's simulate a relationship in which both trial number and age matter, and show how the logistic regression can capture that information. Let's say that younger birds learn faster than older birds. This means that the slope will differ between ages, but the intercept should be the same.
+
+```{r}
+df_smart = df_empty %>% 
+  rowwise() %>% 
+  mutate(correct = ifelse(age=="ad.", rbinom(1,1,log_to_prob(.1*trial_no)), rbinom(1,1,log_to_prob(.2*trial_no))))
+
+ggplot(df_smart,aes(x=trial_no, y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
+```
+
+```{r}
+m1 = glm(correct ~ 1 + age + age:trial_no, data=df_smart, family=binomial)
+summary(m1)
+```
+
+To interpret the intercept for adults, we convert the intercept estimate from log odds to probability.
+
+```{r}
+log_to_prob(coef(m1)[1])
+```
+
+To interpret the intercept for juveniles, we convert the intercept + the beta estimate for juveniles from log odds to probability.
+
+```{r}
+log_to_prob(coef(m1)[1]+coef(m1)[2])
+```
+
+And finally we can plot predictions, faceted by age, to see how the difference in slopes is realized in probability space.
+
+```{r}
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
+ggplot(df_smart,aes(x=trial_no,y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
+```
+
+
+##Interaction effects in slopes and intercepts
+
+This time, younger birds learn faster than older birds *and* are somehow clarivoyant, and are instictively more attracted to the correct choice. This means that both slope and intercept will differ between ages.
+
+```{r}
+df_smart = df_empty %>% 
+  rowwise() %>% 
+  mutate(correct = ifelse(age=="ad.", rbinom(1,1,log_to_prob(.1*trial_no)), rbinom(1,1,log_to_prob(1 + .2*trial_no))))
+
+ggplot(df_smart,aes(x=trial_no, y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)
+```
+
+```{r}
+m1 = glm(correct ~ 1 + age + age:trial_no, data=df_smart, family=binomial)
+summary(m1)
+```
+
+To interpret the intercept for adults, we convert the intercept estimate from log odds to probability.
+
+```{r}
+log_to_prob(coef(m1)[1])
+```
+
+To interpret the intercept for juveniles, we convert the intercept + the beta estimate for juveniles from log odds to probability
+
+```{r}
+log_to_prob(coef(m1)[1]+coef(m1)[2])
+```
+
+We see that the intercept is indeed higher. We can plot finally predictions, faceted by age, to see the difference in slopes and intercepts.
+
+```{r}
+df_predict$preds = predict(m1, newdata = df_predict, type="response")
+df_predict$SE = predict(m1, newdata = df_predict, type="response", se.fit=T)$se.fit
+ggplot(df_smart,aes(x=trial_no,y=correct))+
+  facet_wrap(~age)+
+  geom_jitter(aes(color=bird_ID),height=0.1,show.legend = F,alpha=0.5)+
+  stat_summary(aes(x=trial_no,y=correct),color="darkblue",alpha=0.5)+
+  geom_pointrange(data=df_predict, aes(x=trial_no,y=preds,ymin=preds-SE,ymax=preds+SE))
+```
