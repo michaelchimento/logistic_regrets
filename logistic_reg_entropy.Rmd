@@ -1,0 +1,94 @@
+---
+title: "Exponentiating entropy to understand distributions of behavioral frequencies"
+author: "Michael Chimento"
+date: "4/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(entropy)
+library(tidyverse)
+```
+
+## Defintion of entropy
+
+Culture can be thought of as a collection ($X$) of productions of different types ($x_i$), with each token appearing with a certain frequency, or probability within that collection ($p(x_i)$). It is useful to have a singular measure of the structure present within that collection: that is, are tokens randomly and uniformly distributed, or does one or more tokens dominate the collection.
+
+Shannon entropy, in the sense of information theory, is defined as the amount of information that is needed to fully specify the micro-state state of a system. It can equally be interpreted as the predictability of a system, the structure of the system, or the level of uncertainty in a system. It has been used in the cultural evolution literature as a measure of structure, with structured systems obtaining a low entropy value. Shannon entropy is defined by the following formula.
+
+$H(X) = -\sum_{i}^{n}p(x_i)\log(p(x_i))$
+
+Let's calculate some $H$ values for a few different collections to give an intuition of the relationship between collection and entropy score. We do this using the convenience function `entropy()` from the `entropy` library in R. This function must be called on a table of our collection of types. Collections can be defined as a vector `c()` of productions, which is then passed to the `table()` function. 
+
+The first collection is composed of 1 type of behavioral production 100% of the time.
+```{r}
+collection = c(1)
+entropy(table(collection))
+```
+
+This is a perfectly predictable system. Further, the $H$ value remains the same no matter the size of the collection.
+```{r}
+collection = c(1,1,1,1)
+entropy(table(collection))
+```
+
+How about a system of two components, produced at equal frequency.
+```{r}
+collection1 = c(1,2)
+entropy(table(collection1))
+collection2 = c(1,2,1,2)
+entropy(table(collection2))
+```
+
+$H$ has risen to 0.69, as these collections are less predictable than the first. We can also see that the order of productions in our vector does not affect entropy. This is not an appropriate measure for any analysis that is asking questions related to order. Entropy only cares about the distribution of types within a collection.
+
+Just for fun, let's try 3 items:
+```{r}
+collection = c(1,2,3)
+entropy(table(collection))
+```
+
+All of the above collections are also examples of **maximum entropy**, an edge case in collections where the distribution of types is uniform. If the distribution of types changes in any way from this state, one type must be favored over others, and the entropy score will decline. For example:
+
+```{r}
+collection = c(1,2,3,3)
+entropy(table(collection))
+```
+
+## Exponentiating entropy
+
+In the case of a system at maximum entropy, there is a useful trick to know: exponentiating ($e^H$) the entropy of a system will return the integer number of types in that system, as the following table demonstrates.
+
+```{r, message=F}
+name = c("1 type","2 types", "3 types")
+collection = list(c(1),c(1,2),c(1,2,3))
+df = tibble(name, collection) %>% group_by(name,collection) %>% summarize(H = entropy(table(collection)), exp_H=exp(H))
+knitr::kable(df)
+```
+
+This trick is useful for quickly assessing how many types are dominating a collection. The exponentiated H value will hover nearby the integer value of whichever number of components are produced in highest frequency, relatively independently from the number of distinct types present in the collection. To see how this works, let's add some other behaviors into each of these collections, so that the maximum exp(entropy) would be 5, but still heavily weight 1, 2, or 3 dominant types within a collection. In these cases, the dominant types will outnumber the non-dominant types by about 100:1.
+
+```{r, message=F}
+name = c("1 type","2 types", "3 types")
+collection = list(c(rep(1,100),2,3,4,5),c(rep(c(1,2),100),3,4,5),c(rep(c(1,2,3),100),4,5))
+df = tibble(name, collection) %>% group_by(name,collection) %>% summarize(H = entropy(table(collection)), exp_H=exp(H)) %>% select(!collection)
+knitr::kable(df, col.names = c("dominant types", "H", "exp(H)"))
+```
+
+The heavier the weighting of dominant types, the closer $exp(H)$ is to the integer value of dominant types. Let's recalculate for 1000:1 weighting.
+```{r, message=F}
+name = c("1 type","2 types", "3 types")
+collection = list(c(rep(1,1000),2,3,4,5),c(rep(c(1,2),1000),3,4,5),c(rep(c(1,2,3),1000),4,5))
+df = tibble(name, collection) %>% group_by(name,collection) %>% summarize(H = entropy(table(collection)), exp_H=exp(H)) %>% select(!collection)
+knitr::kable(df, col.names = c("dominant types", "H", "exp(H)"))
+```
+
+But what about a case where the most frequent solutions are not as dominant, only outnumbering the non-dominant solutions by 2:1?
+```{r, message=F}
+name = c("1 type","2 types", "3 types")
+collection = list(c(rep(1,2),2,3,4,5),c(rep(c(1,2),2),3,4,5),c(rep(c(1,2,3),2),4,5))
+df = tibble(name, collection) %>% group_by(name,collection) %>% summarize(H = entropy(table(collection)), exp_H=exp(H)) %>% select(!collection)
+knitr::kable(df, col.names = c("dominant types", "H", "exp(H)"))
+```
+The trick is still informative if we know the number of types in the system. $exp(H)$ is much closer to the maximum entropy value, indicating that no particular solutions are heavily dominating the set.
