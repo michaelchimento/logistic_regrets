@@ -13,19 +13,11 @@ continuous interaction, this is continuous.
 
 ## Simulating data
 
-Let’s imagine an experiment that you’ve just designed. You have a
-population of birds (let’s say, great tits) that all have been banded
-with an RFID code, so you can identify individuals. You have feeders
-which have antennas that read their identity, and can give or deny
-access to the feeder, based on the identity of the bird. You split the
-birds into two groups, where Group A only has access to Feeder A, and
-Group B only has access to Feeder B. You’d like to test how quickly the
-birds learn, or, how the probability of choosing the “correct” feeder
-changes with each visit to the feeder.
-
-Let’s start by defining a vector of identities for individual birds. We
-will take advantage of R’s letters variable, which contains the entire
-lower case, English alphabet.
+We can simulate 20 individuals, each performing 10 trials at a given
+task. They will increase in proficiency, but the rate of increase
+depends on their rank. Also, each individual has a slightly different
+starting point, a random intercept, where some are at an advantage and
+some are at a disadvantage.
 
 ``` r
 n_individuals <- 20
@@ -64,9 +56,12 @@ correct <- rbinom(n_obs, size = 1, prob = prob_correct)
 df <- data.frame(id = as.factor(id), trial, rank, correct)
 ```
 
+Let’s plot the simulated datapoints, we can see the density of correct
+choices increases over time:
+
 ``` r
 ggplot(df, aes(x=trial, y=correct))+
-  geom_point(alpha=0.1)
+  geom_jitter(alpha=0.5, height=0.05)
 ```
 
 ![](plotting_continuous_interactions_lmer_files/figure-gfm/plot%20simulated%20data-1.png)<!-- -->
